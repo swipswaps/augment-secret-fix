@@ -12,24 +12,30 @@ import psutil
 import subprocess
 import logging
 import traceback
+import argparse
 from datetime import datetime
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
 
 class AugmentSecretDetector:
-    def __init__(self):
+    def __init__(self, cpu_threshold=80.0, monitoring_duration=30, disk_threshold=50, network_threshold=10, extensions_dir=None):
         # Support both VSCode and VSCode Insiders extension directories
         self.config_dirs = [
             Path.home() / ".vscode" / "extensions",
             Path.home() / ".vscode-insiders" / "extensions"
         ]
-        # Check for environment variable override
-        if os.getenv('VSC_EXT_DIR'):
+
+        # Check for custom extensions directory
+        if extensions_dir:
+            self.config_dirs.insert(0, Path(extensions_dir))
+        elif os.getenv('VSC_EXT_DIR'):
             self.config_dirs.insert(0, Path(os.getenv('VSC_EXT_DIR')))
 
         self.augment_dirs = []
-        self.cpu_threshold = 80.0  # CPU usage threshold
-        self.monitoring_duration = 30  # seconds
+        self.cpu_threshold = cpu_threshold
+        self.monitoring_duration = monitoring_duration
+        self.disk_threshold = disk_threshold  # MB per 2 seconds
+        self.network_threshold = network_threshold  # MB per 1 second
         self.log_file = "augment_secret_detection.log"
 
         # Setup rotating log handler
@@ -120,22 +126,32 @@ class AugmentSecretDetector:
     def analyze_processes(self):
         """Analyze running processes for Augment-related activity"""
         self.log("🔍 Analyzing running processes...")
-        
+
         augment_processes = []
-        
-        for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_info']):
+
+        # First pass: Prime CPU monitoring for all processes
+        for proc in psutil.process_iter(['pid', 'name', 'memory_info']):
             try:
-                proc_info = proc.info
-                proc_name = proc_info['name'].lower()
-                
+                proc.cpu_percent()  # Prime the CPU monitoring
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+
+        # Wait for CPU measurement interval
+        time.sleep(0.1)
+
+        # Second pass: Get actual CPU usage
+        for proc in psutil.process_iter(['pid', 'name', 'memory_info']):
+            try:
+                proc_name = proc.name().lower()
+
                 # Check for Augment-related processes
                 if any(keyword in proc_name for keyword in ['augment', 'vscode', 'code']):
-                    cpu_usage = proc_info['cpu_percent']
-                    memory_mb = proc_info['memory_info'].rss / 1024 / 1024
+                    cpu_usage = proc.cpu_percent()  # Get current CPU usage
+                    memory_mb = proc.memory_info().rss / 1024 / 1024
                     
                     process_data = {
-                        'pid': proc_info['pid'],
-                        'name': proc_info['name'],
+                        'pid': proc.pid,
+                        'name': proc.name(),
                         'cpu_percent': cpu_usage,
                         'memory_mb': memory_mb
                     }
@@ -147,7 +163,7 @@ class AugmentSecretDetector:
                     normalized_threshold = 80 / cpu_cores  # Adjust threshold based on core count
 
                     if cpu_usage > normalized_threshold:  # High CPU usage process (normalized)
-                        self.log(f"🔥 High CPU process: {proc_info['name']} (PID: {proc_info['pid']}) - CPU: {cpu_usage:.1f}%, Memory: {memory_mb:.1f}MB (Threshold: {normalized_threshold:.1f}%)")
+                        self.log(f"🔥 High CPU process: {proc.name()} (PID: {proc.pid}) - CPU: {cpu_usage:.1f}%, Memory: {memory_mb:.1f}MB (Threshold: {normalized_threshold:.1f}%)")
             
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 continue
@@ -173,8 +189,8 @@ class AugmentSecretDetector:
 
                 self.log(f"💾 Disk I/O Delta (2s) - Read: {read_delta_mb:.1f}MB, Write: {write_delta_mb:.1f}MB")
 
-                # Threshold: >50MB in 2 seconds indicates high activity
-                if read_delta_mb > 50 or write_delta_mb > 50:
+                # Configurable threshold for high activity
+                if read_delta_mb > self.disk_threshold or write_delta_mb > self.disk_threshold:
                     secrets_indicators.append("high_disk_io")
                     self.log("⚠️ High disk I/O delta detected - possible secrets processing")
 
@@ -194,8 +210,8 @@ class AugmentSecretDetector:
 
                 self.log(f"🌐 Network I/O Delta (1s) - Sent: {sent_delta_mb:.1f}MB, Received: {recv_delta_mb:.1f}MB")
 
-                # Threshold: >10MB in 1 second indicates high activity
-                if sent_delta_mb > 10 or recv_delta_mb > 10:
+                # Configurable threshold for high activity
+                if sent_delta_mb > self.network_threshold or recv_delta_mb > self.network_threshold:
                     secrets_indicators.append("high_network_io")
                     self.log("⚠️ High network activity delta detected - possible secrets transmission")
 
@@ -269,35 +285,42 @@ def main():
         print("   Please run as a regular user.")
         sys.exit(1)
 
-    if len(sys.argv) > 1 and sys.argv[1] == "--help":
-        print("""
-🔍 AUGMENT SECRET DETECTOR
-
-Usage: python3 augment_secret_detector.py [options]
-
-Options:
-    --help          Show this help message
-    --duration N    Set monitoring duration in seconds (default: 30)
-    --threshold N   Set CPU threshold percentage (default: 80)
-
-Environment Variables:
-    VSC_EXT_DIR     Override VSCode extensions directory
-
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(
+        description='🔍 AUGMENT SECRET DETECTOR - Monitor CPU and detect secrets activity',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
 Examples:
     python3 augment_secret_detector.py
-    python3 augment_secret_detector.py --duration 60 --threshold 70
-    VSC_EXT_DIR=/custom/path python3 augment_secret_detector.py
-        """)
-        return
-    
-    detector = AugmentSecretDetector()
-    
-    # Parse command line arguments
-    for i, arg in enumerate(sys.argv):
-        if arg == "--duration" and i + 1 < len(sys.argv):
-            detector.monitoring_duration = int(sys.argv[i + 1])
-        elif arg == "--threshold" and i + 1 < len(sys.argv):
-            detector.cpu_threshold = float(sys.argv[i + 1])
+    python3 augment_secret_detector.py --duration 60 --cpu-threshold 70
+    python3 augment_secret_detector.py --disk-threshold 100 --network-threshold 20
+    python3 augment_secret_detector.py --extensions-dir /custom/vscode/extensions
+
+Environment Variables:
+    VSC_EXT_DIR     Override VSCode extensions directory (if --extensions-dir not specified)
+        """
+    )
+
+    parser.add_argument('--duration', type=int, default=30,
+                       help='Monitoring duration in seconds (default: 30)')
+    parser.add_argument('--cpu-threshold', type=float, default=80.0,
+                       help='CPU threshold percentage (default: 80.0)')
+    parser.add_argument('--disk-threshold', type=float, default=50.0,
+                       help='Disk I/O threshold in MB per 2 seconds (default: 50.0)')
+    parser.add_argument('--network-threshold', type=float, default=10.0,
+                       help='Network I/O threshold in MB per 1 second (default: 10.0)')
+    parser.add_argument('--extensions-dir', type=str,
+                       help='Custom VSCode extensions directory path')
+
+    args = parser.parse_args()
+
+    detector = AugmentSecretDetector(
+        cpu_threshold=args.cpu_threshold,
+        monitoring_duration=args.duration,
+        disk_threshold=args.disk_threshold,
+        network_threshold=args.network_threshold,
+        extensions_dir=args.extensions_dir
+    )
     
     try:
         report = detector.run_detection()

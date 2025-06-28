@@ -354,6 +354,29 @@ code-insiders
 rm -rf ~/.cache/vscode-*
 ```
 
+#### **❌ "Too many false positives" in detection**
+**Cause**: Default thresholds too sensitive for your environment
+**Solution**:
+```bash
+# Increase thresholds for less sensitive detection
+python3 augment_secret_detector.py --cpu-threshold 90 --disk-threshold 100 --network-threshold 25
+
+# For CI/server environments
+python3 augment_secret_detector.py --disk-threshold 200 --network-threshold 50
+```
+
+#### **❌ "No extensions found" with custom VSCode installation**
+**Cause**: Non-standard VSCode installation path
+**Solution**:
+```bash
+# Specify custom extensions directory
+python3 augment_secret_detector.py --extensions-dir /path/to/vscode/extensions
+
+# Or set environment variable
+export VSC_EXT_DIR=/path/to/vscode/extensions
+python3 augment_secret_detector.py
+```
+
 #### **❌ "Extension locked" during version management**
 **Cause**: Extension folder is read-only from previous locking
 **Solution**:
@@ -412,10 +435,15 @@ journalctl --user -f | grep augment.sessions
 # Install required dependencies
 pip3 install psutil
 
+# Or install from requirements.txt
+pip3 install -r requirements.txt
+
 # For advanced features (optional)
 sudo apt install jq moreutils  # Ubuntu/Debian
 sudo dnf install jq moreutils  # Fedora
 ```
+
+**Note**: `psutil` is essential for system monitoring - the scripts will not work without it.
 
 #### **Supported VSCode Installations**
 - **Standard VSCode**: `~/.vscode/extensions`
@@ -436,6 +464,11 @@ sudo dnf install jq moreutils  # Fedora
 - **Safe file operations**: Uses atomic file operations where possible
 - **Error handling**: Graceful degradation on permission errors
 - **Audit trail**: All operations logged with timestamps
+
+#### **⚠️ Privacy Notice**
+- **Process monitoring**: This tool logs process names and system activity
+- **Report sharing**: Detection reports may contain file paths and process information
+- **Recommendation**: Review reports before sharing publicly to avoid exposing sensitive paths
 
 #### **Installation**
 ```bash
@@ -460,6 +493,22 @@ chmod +x *.sh *.py
 
 # Run the master control script
 ./augment_secret_fix.sh
+```
+
+### **🧪 Testing**
+```bash
+# Run unit tests to verify functionality
+python3 -m pytest test_augment_secret_detector.py -v
+
+# Or run with standard unittest
+python3 test_augment_secret_detector.py
+
+# Expected output:
+# test_analyze_processes_high_cpu ... ok
+# test_cli_argument_parsing ... ok
+# test_detect_secrets_activity_high_disk_io ... ok
+# test_generate_report_structure ... ok
+# test_monitor_cpu_usage_threshold_detection ... ok
 ```
 
 ## 🚀 **PERFORMANCE IMPROVEMENTS**
@@ -494,6 +543,48 @@ Based on comprehensive code audit, the following performance improvements have b
 - **Exception safety**: Full tracebacks logged to file, sanitized output to console
 
 ## 📈 Usage Examples
+
+### **🔍 Secret Detection & Monitoring**
+
+#### **Basic Detection**
+```bash
+# Run with default settings (30s monitoring, 80% CPU threshold)
+python3 augment_secret_detector.py
+
+# Extended monitoring with custom thresholds
+python3 augment_secret_detector.py --duration 60 --cpu-threshold 70
+
+# Adjust I/O sensitivity for different environments
+python3 augment_secret_detector.py --disk-threshold 100 --network-threshold 20
+
+# Custom VSCode extensions directory
+python3 augment_secret_detector.py --extensions-dir /custom/vscode/extensions
+```
+
+#### **Environment-Specific Configurations**
+```bash
+# Development laptop (sensitive to I/O)
+python3 augment_secret_detector.py --disk-threshold 25 --network-threshold 5
+
+# CI/Headless server (less sensitive)
+python3 augment_secret_detector.py --disk-threshold 200 --network-threshold 50
+
+# High-performance workstation (higher CPU threshold)
+python3 augment_secret_detector.py --cpu-threshold 90 --duration 120
+```
+
+#### **Expected Output**
+```
+[2025-06-28 08:00:00] 🚀 Starting Augment Secret Detection
+[2025-06-28 08:00:00] 🔍 Scanning for Augment extensions...
+[2025-06-28 08:00:00] 📁 Scanning directory: .vscode/extensions
+[2025-06-28 08:00:00] ✅ Found Augment extension: augment.vscode-augment-0.467.1 in extensions
+[2025-06-28 08:00:00] 📊 Monitoring CPU usage for 30 seconds...
+[2025-06-28 08:00:15] ⚠️ High CPU usage detected: 85.2%
+[2025-06-28 08:00:15] 🔥 High CPU process: code-insiders (PID: 12345) - CPU: 45.3%, Memory: 256.7MB
+[2025-06-28 08:00:30] 📈 CPU Analysis - Average: 82.1%, Peak: 95.4%
+[2025-06-28 08:00:30] ✅ Detection complete
+```
 
 ## ⚙️ Configuration
 
