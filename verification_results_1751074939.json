@@ -1,0 +1,46 @@
+{
+  "timestamp": "2025-06-27T21:42:15.846081",
+  "repository_url": "https://github.com/swipswaps/augment-secret-fix",
+  "tests": {
+    "repository_exists": {
+      "status": "PASS",
+      "title": ""
+    },
+    "essential_files": {
+      "status": "PASS",
+      "files": {
+        "README.md": "FOUND",
+        "LICENSE": "FOUND"
+      }
+    },
+    "project_files": {
+      "status": "PASS",
+      "count": 5,
+      "files": [
+        "augment_secret_detector.py",
+        "augment_secret_detector.py",
+        "augment_secret_fix.sh",
+        "augment_secret_fix.sh",
+        "augment_version_manager.py"
+      ]
+    },
+    "description": {
+      "status": "PASS",
+      "text": ""
+    },
+    "commits": {
+      "status": "PASS",
+      "text": "1 Commit"
+    },
+    "ci_integration": {
+      "status": "PASS",
+      "found": true
+    },
+    "content_verification": {
+      "status": "PASS",
+      "contains_repo_name": true
+    }
+  },
+  "overall_status": "SUCCESS",
+  "screenshot": "augment-secret-fix_verification_1751074938.png"
+}

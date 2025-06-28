@@ -14,11 +14,15 @@ from pathlib import Path
 
 class VSCodeUpdater:
     def __init__(self):
-        self.vscode_config = Path.home() / ".config" / "Code" / "User"
+        # Support both VSCode and VSCode Insiders
+        self.vscode_configs = [
+            Path.home() / ".config" / "Code" / "User",
+            Path.home() / ".config" / "Code - Insiders" / "User"
+        ]
         self.chat_logs_dir = Path.home() / ".augment_chat_logs"
         self.backup_dir = Path.home() / ".vscode_update_backups"
         self.log_file = "vscode_updater.log"
-        
+
         # Ensure directories exist
         self.chat_logs_dir.mkdir(exist_ok=True)
         self.backup_dir.mkdir(exist_ok=True)
@@ -36,13 +40,23 @@ class VSCodeUpdater:
         """Find all Augment chat logs"""
         chat_logs = []
         
-        # Common chat log locations
-        search_paths = [
-            self.vscode_config / "globalStorage",
-            self.vscode_config / "workspaceStorage",
+        # Common chat log locations for both VSCode and Insiders
+        search_paths = []
+
+        # Add paths for all VSCode configurations
+        for config in self.vscode_configs:
+            if config.exists():
+                search_paths.extend([
+                    config / "globalStorage",
+                    config / "workspaceStorage",
+                    config.parent / "logs"
+                ])
+
+        # Add extension directories
+        search_paths.extend([
             Path.home() / ".vscode" / "extensions",
-            Path.home() / ".config" / "Code" / "logs"
-        ]
+            Path.home() / ".vscode-insiders" / "extensions"
+        ])
         
         for search_path in search_paths:
             if search_path.exists():

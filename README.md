@@ -401,15 +401,52 @@ journalctl --user -f | grep augment.sessions
 ## 🚀 Quick Start
 
 ### **Prerequisites**
+
+#### **System Requirements**
+- **Linux** (tested on Fedora 42, Ubuntu 22.04+)
+- **Python 3.8+** with pip
+- **VSCode or VSCode Insiders** installed
+
+#### **Required Python Packages**
+```bash
+# Install required dependencies
+pip3 install psutil
+
+# For advanced features (optional)
+sudo apt install jq moreutils  # Ubuntu/Debian
+sudo dnf install jq moreutils  # Fedora
+```
+
+#### **Supported VSCode Installations**
+- **Standard VSCode**: `~/.vscode/extensions`
+- **VSCode Insiders**: `~/.vscode-insiders/extensions`
+- **Custom locations**: Set `VSC_EXT_DIR` environment variable
+
+### **🔒 Security & Trust**
+
+#### **Why Should You Trust This Code?**
+- **Open Source**: All code is publicly auditable on GitHub
+- **No Root Required**: Scripts explicitly refuse to run as root for security
+- **Path Redaction**: Error messages redact sensitive home directory paths
+- **Log Rotation**: Prevents log files from growing indefinitely (5MB max, 3 backups)
+- **Minimal Permissions**: Only reads process information, no system modifications
+
+#### **Security Features**
+- **Process isolation**: Monitors only user-accessible processes
+- **Safe file operations**: Uses atomic file operations where possible
+- **Error handling**: Graceful degradation on permission errors
+- **Audit trail**: All operations logged with timestamps
+
+#### **Installation**
 ```bash
 # Python dependencies
 pip install -r requirements.txt
 
 # System dependencies (Ubuntu/Debian)
-sudo apt update && sudo apt install -y git curl
+sudo apt update && sudo apt install -y git curl jq moreutils
 
 # System dependencies (Fedora)
-sudo dnf install -y git curl
+sudo dnf install -y git curl jq moreutils
 ```
 
 ### **Installation**
@@ -419,8 +456,42 @@ git clone https://github.com/swipswaps/augment-secret-fix.git
 cd augment-secret-fix
 
 # Make scripts executable
-chmod +x *.sh
+chmod +x *.sh *.py
+
+# Run the master control script
+./augment_secret_fix.sh
 ```
+
+## 🚀 **PERFORMANCE IMPROVEMENTS**
+
+### **⚡ Recent Optimizations**
+
+Based on comprehensive code audit, the following performance improvements have been implemented:
+
+#### **🔧 CPU Monitoring Efficiency**
+- **Removed double sleep**: Fixed `psutil.cpu_percent(interval=1)` + `time.sleep(1)` redundancy
+- **Halved monitoring time**: CPU sampling now takes 30 seconds instead of 60 seconds
+- **Normalized thresholds**: Per-process CPU alerts now adjust for multi-core systems
+
+#### **📊 I/O Detection Accuracy**
+- **Delta measurement**: Now measures I/O activity over intervals instead of cumulative totals
+- **Reduced false positives**: Thresholds adjusted for realistic activity levels
+- **Better precision**: 2-second disk I/O sampling, 1-second network sampling
+
+#### **🗂️ Multi-Platform Support**
+- **VSCode Insiders**: Automatic detection of `~/.vscode-insiders/extensions`
+- **Custom paths**: Support for `VSC_EXT_DIR` environment variable
+- **Flatpak compatibility**: Enhanced path detection for containerized installations
+
+#### **📝 Log Management**
+- **Rotating logs**: 5MB maximum file size with 3 backup rotations
+- **Reduced disk usage**: Prevents unlimited log growth
+- **Better performance**: Avoids large file I/O operations
+
+#### **🛡️ Security Enhancements**
+- **Root prevention**: Scripts refuse to run as root for security
+- **Path redaction**: Sensitive home directory paths hidden in error messages
+- **Exception safety**: Full tracebacks logged to file, sanitized output to console
 
 ## 📈 Usage Examples
 
