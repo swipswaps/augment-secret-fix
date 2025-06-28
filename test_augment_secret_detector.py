@@ -112,13 +112,16 @@ class TestAugmentSecretDetector(unittest.TestCase):
     
     def test_find_augment_extensions_no_directories(self):
         """Test extension finding when no directories exist"""
-        # Create detector with non-existent directories
-        detector = AugmentSecretDetector(extensions_dir="/nonexistent/path")
-        
-        extensions = detector.find_augment_extensions()
-        
-        # Should return empty list when no directories exist
-        self.assertEqual(len(extensions), 0)
+        # Create detector with non-existent directories only
+        with patch.dict(os.environ, {}, clear=True):  # Clear environment variables
+            detector = AugmentSecretDetector(extensions_dir="/nonexistent/path")
+            # Override config_dirs to only include non-existent path
+            detector.config_dirs = [Path("/nonexistent/path")]
+
+            extensions = detector.find_augment_extensions()
+
+            # Should return empty list when no directories exist
+            self.assertEqual(len(extensions), 0)
     
     def test_generate_report_structure(self):
         """Test that generated reports have correct structure"""
@@ -150,8 +153,8 @@ class TestAugmentSecretDetector(unittest.TestCase):
     @patch('augment_secret_detector.psutil.cpu_percent')
     def test_monitor_cpu_usage_threshold_detection(self, mock_cpu_percent):
         """Test CPU monitoring detects threshold violations"""
-        # Mock CPU readings that exceed threshold
-        mock_cpu_percent.side_effect = [85.0, 90.0, 75.0]  # Some high, some normal
+        # Mock CPU readings that exceed threshold - need enough for the duration
+        mock_cpu_percent.side_effect = [85.0, 90.0, 75.0, 80.0, 85.0]  # Enough readings for test
         
         # Use very short monitoring duration for test
         self.detector.monitoring_duration = 3
