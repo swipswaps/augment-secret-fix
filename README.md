@@ -127,6 +127,263 @@ ext_dir="$(code-insiders --list-extensions --show-versions \
 chmod -R a-w "$ext_dir/augment.vscode-augment-0.467.1"
 ```
 
+## 💬 **CHAT LOG BACKUP & RECOVERY SYSTEM**
+
+### **🏗️ How the Protection System Works**
+
+The chat log backup system provides **comprehensive protection** for your Augment conversation history during VSCode updates and system changes.
+
+#### **📁 Directory Structure Created**
+```
+~/.augment_chat_logs/           # Main chat logs directory (created automatically)
+~/.vscode_update_backups/       # Backup storage location
+  ├── chat_backup_20250627_120000/
+  │   ├── backup_manifest.json   # Complete inventory of backed-up files
+  │   ├── .config/Code/User/globalStorage/     # VSCode global extension data
+  │   ├── .config/Code/User/workspaceStorage/  # Workspace-specific data
+  │   └── .vscode/extensions/                  # Extension directories
+  └── chat_backup_20250627_130000/
+      └── ... (additional backup sessions)
+```
+
+#### **🔍 Comprehensive Chat Log Discovery**
+
+The system automatically searches **multiple locations** where Augment stores chat data:
+
+| Location | Purpose | Files Found |
+|----------|---------|-------------|
+| `~/.config/Code/User/globalStorage/` | VSCode global extension data | `augment.*.json`, conversation histories |
+| `~/.config/Code/User/workspaceStorage/` | Workspace-specific extension data | Project-specific chat logs |
+| `~/.vscode/extensions/` | Extension installation directories | Extension-embedded chat data |
+| `~/.config/Code/logs/` | VSCode application logs | Debug logs, error traces |
+
+**File patterns detected:**
+- `*augment*` - All Augment extension files
+- `*chat*` - Chat-related files
+- `*conversation*` - Conversation history files
+
+**Supported file types:** `.json`, `.log`, `.txt`, `.db`
+
+#### **💾 Backup Process (Automatic & Manual)**
+
+**What happens during backup:**
+
+1. **Discovery Phase**: Scans all locations for Augment-related files
+2. **Timestamp Creation**: Creates unique backup session (e.g., `chat_backup_20250627_120000`)
+3. **Path Preservation**: Maintains original directory structure in backup
+4. **File Copying**: Uses `shutil.copy2()` to preserve metadata and timestamps
+5. **Manifest Generation**: Creates detailed inventory of all backed-up files
+
+**Backup Manifest Example:**
+```json
+{
+  "timestamp": "20250627_120000",
+  "backup_dir": "/home/user/.vscode_update_backups/chat_backup_20250627_120000",
+  "files": [
+    {
+      "original": "/home/user/.config/Code/User/globalStorage/augment.chat.json",
+      "backup": "/home/user/.vscode_update_backups/chat_backup_20250627_120000/.config/Code/User/globalStorage/augment.chat.json",
+      "size": 15420
+    }
+  ],
+  "total_files": 15
+}
+```
+
+#### **📥 Recovery Options (User Choice)**
+
+**Three recovery methods available:**
+
+1. **Automatic Latest**: Restores most recent backup
+2. **Specific Timestamp**: Restore from exact backup session
+3. **Interactive Menu**: Choose from available backups with details
+
+**Interactive Recovery Example:**
+```
+🔄 CHAT LOG RESTORATION
+========================================
+Available backups:
+  1. 20250627_120000 - 15 files (2.3MB)
+  2. 20250627_110000 - 12 files (1.8MB)
+  3. 20250627_100000 - 10 files (1.5MB)
+  4. Cancel
+
+Select backup to restore (number): 1
+Restore backup from 20250627_120000? (y/N): y
+✅ Restored 15 chat log files
+```
+
+### **🛠️ Usage Commands**
+
+#### **Manual Backup (Before Risky Operations)**
+```bash
+# Backup current chat logs
+python3 vscode_updater.py backup-logs
+
+# Expected output:
+# [2025-06-27 12:00:00] 💾 Backing up chat logs...
+# [2025-06-27 12:00:01] 📝 Found chat log: /home/user/.config/Code/User/globalStorage/augment.chat.json
+# [2025-06-27 12:00:01] ✅ Backed up: augment.chat.json
+# [2025-06-27 12:00:02] ✅ Backed up 15 chat log files
+```
+
+#### **Safe VSCode Update (Automatic Backup)**
+```bash
+# Update with automatic chat protection
+python3 vscode_updater.py update
+
+# The system will:
+# 1. Automatically backup all chat logs
+# 2. Update VSCode using detected package manager
+# 3. Offer to restore chat logs after update
+```
+
+#### **List Available Backups**
+```bash
+# See all available backup sessions
+python3 vscode_updater.py list-backups
+
+# Expected output:
+# [2025-06-27 12:00:00] 📋 Available chat log backups:
+#   📦 chat_backup_20250627_120000 - Files: 15, Size: 2.3MB
+#   📦 chat_backup_20250627_110000 - Files: 12, Size: 1.8MB
+```
+
+#### **Restore Chat Logs**
+```bash
+# Interactive restoration (recommended)
+python3 vscode_updater.py interactive-restore
+
+# Restore latest backup automatically
+python3 vscode_updater.py restore-logs
+
+# Restore specific backup by timestamp
+python3 vscode_updater.py restore-logs 20250627_120000
+```
+
+### **🛡️ Protection Features**
+
+#### **✅ What's Protected**
+- **All conversation histories** with Augment
+- **Extension settings and preferences**
+- **Workspace-specific chat data**
+- **Debug logs and error traces**
+- **File metadata and timestamps**
+
+#### **🔄 When Backups Occur**
+- **Before VSCode updates** (automatic)
+- **Manual backup commands** (on-demand)
+- **Before system maintenance** (recommended)
+- **Before Augment version changes** (recommended)
+
+#### **🚨 Error Prevention**
+- **Atomic operations**: Each backup is complete or fails entirely
+- **Path validation**: Ensures backup directories exist
+- **Permission checks**: Verifies write access before starting
+- **Manifest verification**: Confirms all files were backed up
+- **Graceful degradation**: Continues even if individual files fail
+
+### **⚠️ Important Notes**
+
+1. **Backup Location**: Backups are stored in `~/.vscode_update_backups/` - ensure this location has sufficient disk space
+2. **Automatic Cleanup**: Old backups are NOT automatically deleted - manage disk space manually
+3. **Cross-Profile**: Backups are profile-specific - different VSCode profiles need separate backups
+4. **Permissions**: Restored files maintain original permissions and ownership
+5. **Verification**: Always verify chat logs are working after restoration
+
+### **🔧 Troubleshooting Common Issues**
+
+#### **❌ "No chat logs found" Error**
+**Cause**: VSCode or Augment not yet used, or non-standard installation
+**Solution**:
+```bash
+# Manually check for chat files
+find ~/.config ~/.vscode -name "*augment*" -type f 2>/dev/null
+find ~/.config ~/.vscode -name "*chat*" -type f 2>/dev/null
+
+# If files exist but not detected, check permissions
+ls -la ~/.config/Code/User/globalStorage/
+```
+
+#### **❌ "Backup directory permission denied"**
+**Cause**: Insufficient permissions to create backup directories
+**Solution**:
+```bash
+# Ensure backup directory is writable
+mkdir -p ~/.vscode_update_backups
+chmod 755 ~/.vscode_update_backups
+
+# Check available disk space
+df -h ~/.vscode_update_backups
+```
+
+#### **❌ "Restoration failed" Error**
+**Cause**: Target directories don't exist or are read-only
+**Solution**:
+```bash
+# Ensure VSCode config directories exist
+mkdir -p ~/.config/Code/User/globalStorage
+mkdir -p ~/.config/Code/User/workspaceStorage
+
+# Check and fix permissions
+chmod 755 ~/.config/Code/User/
+```
+
+#### **❌ "Manifest file not found"**
+**Cause**: Incomplete or corrupted backup
+**Solution**:
+```bash
+# List backup contents to verify
+ls -la ~/.vscode_update_backups/chat_backup_*/
+
+# Use a different backup if available
+python3 vscode_updater.py list-backups
+python3 vscode_updater.py interactive-restore
+```
+
+#### **❌ Chat logs not appearing after restoration**
+**Cause**: VSCode caching or extension not reloaded
+**Solution**:
+```bash
+# Restart VSCode completely
+pkill -f "code"
+sleep 2
+code-insiders
+
+# Clear VSCode cache if needed
+rm -rf ~/.cache/vscode-*
+```
+
+#### **❌ "Extension locked" during version management**
+**Cause**: Extension folder is read-only from previous locking
+**Solution**:
+```bash
+# Temporarily unlock for legitimate changes
+ext_dir="$(code-insiders --list-extensions --show-versions \
+          | awk -F@ '/augment.vscode-augment/ {print $(NF)}' | xargs dirname)"
+chmod -R u+w "$ext_dir/augment.vscode-augment-0.467.1"
+
+# Perform operation, then re-lock
+# ... do your changes ...
+chmod -R a-w "$ext_dir/augment.vscode-augment-0.467.1"
+```
+
+### **📋 Pre-Operation Checklist**
+
+**Before running any commands:**
+- [ ] Ensure sufficient disk space (check with `df -h ~`)
+- [ ] Close VSCode completely (`pkill -f code`)
+- [ ] Verify you're using the correct VSCode variant (Insiders vs Stable)
+- [ ] Check that required tools are installed (`jq`, `sponge`)
+- [ ] Backup current state before making changes
+
+**After restoration:**
+- [ ] Start VSCode and verify Augment extension loads
+- [ ] Check that chat history is accessible
+- [ ] Test that new conversations work properly
+- [ ] Verify extension settings are preserved
+- [ ] Monitor system performance for improvements
+
 ### **✅ Verification Commands**
 
 ```bash
