@@ -1,0 +1,15 @@
+LICENSE
+README.md
+pyproject.toml
+augment_secret_fix/__init__.py
+augment_secret_fix/cli.py
+augment_secret_fix/detector.py
+augment_secret_fix/updater.py
+augment_secret_fix/version_manager.py
+augment_secret_fix.egg-info/PKG-INFO
+augment_secret_fix.egg-info/SOURCES.txt
+augment_secret_fix.egg-info/dependency_links.txt
+augment_secret_fix.egg-info/entry_points.txt
+augment_secret_fix.egg-info/requires.txt
+augment_secret_fix.egg-info/top_level.txt
+tests/test_detector.py

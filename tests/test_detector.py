@@ -12,10 +12,8 @@ from pathlib import Path
 import sys
 import os
 
-# Add the current directory to the path so we can import our module
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-from augment_secret_detector import AugmentSecretDetector
+# Import from the package
+from augment_secret_fix.detector import AugmentSecretDetector
 
 
 class TestAugmentSecretDetector(unittest.TestCase):
@@ -52,7 +50,7 @@ class TestAugmentSecretDetector(unittest.TestCase):
         self.assertIn(Path(custom_dir), detector.config_dirs)
         self.assertEqual(detector.config_dirs[0], Path(custom_dir))
 
-    @patch("augment_secret_detector.psutil.process_iter")
+    @patch("augment_secret_fix.detector.psutil.process_iter")
     def test_analyze_processes_high_cpu(self, mock_process_iter):
         """Test that high CPU processes are detected and reported"""
         # Mock a high CPU process

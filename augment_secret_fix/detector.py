@@ -17,6 +17,28 @@ from datetime import datetime
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
 
+# Optional UI enhancements
+try:
+    from colorama import Fore, Back, Style, init as colorama_init
+    from tqdm import tqdm
+    colorama_init(autoreset=True)
+    HAS_UI_LIBS = True
+except ImportError:
+    # Fallback for systems without UI libraries
+    class MockColor:
+        RED = GREEN = YELLOW = BLUE = MAGENTA = CYAN = WHITE = ""
+        RESET = ""
+
+    Fore = Back = Style = MockColor()
+
+    def tqdm(iterable=None, **kwargs):
+        """Fallback tqdm that just returns the iterable"""
+        if iterable is not None:
+            return iterable
+        return lambda x: x
+
+    HAS_UI_LIBS = False
+
 
 class AugmentSecretDetector:
     def __init__(
@@ -52,6 +74,11 @@ class AugmentSecretDetector:
     def setup_logging(self):
         """Setup rotating file handler for logs"""
         self.logger = logging.getLogger("augment_secret_detector")
+
+        # Prevent duplicate handlers
+        if self.logger.handlers:
+            return
+
         self.logger.setLevel(logging.INFO)
 
         # Create rotating file handler (5MB max, keep 3 backups)
@@ -68,9 +95,38 @@ class AugmentSecretDetector:
         console_handler.setFormatter(formatter)
         self.logger.addHandler(console_handler)
 
-    def log(self, message):
-        """Log messages with timestamp"""
-        self.logger.info(message)
+        # Prevent propagation to root logger
+        self.logger.propagate = False
+
+    def log(self, message, level="info"):
+        """Log messages with timestamp and color"""
+        # Add color based on message content and level
+        if HAS_UI_LIBS:
+            if level == "error" or "❌" in message:
+                colored_message = f"{Fore.RED}{message}{Style.RESET_ALL}"
+            elif level == "warning" or "⚠️" in message:
+                colored_message = f"{Fore.YELLOW}{message}{Style.RESET_ALL}"
+            elif level == "success" or "✅" in message:
+                colored_message = f"{Fore.GREEN}{message}{Style.RESET_ALL}"
+            elif "🔥" in message:
+                colored_message = f"{Fore.RED}{Style.BRIGHT}{message}{Style.RESET_ALL}"
+            elif "📊" in message or "📈" in message:
+                colored_message = f"{Fore.CYAN}{message}{Style.RESET_ALL}"
+            else:
+                colored_message = message
+        else:
+            colored_message = message
+
+        # Log to file without color codes
+        if level == "error":
+            self.logger.error(message)
+        elif level == "warning":
+            self.logger.warning(message)
+        else:
+            self.logger.info(message)
+
+        # Print to console with color
+        print(colored_message)
 
     def find_augment_extensions(self):
         """Find all Augment extension directories"""
@@ -105,15 +161,41 @@ class AugmentSecretDetector:
         cpu_readings = []
         start_time = time.time()
 
+        # Prime CPU monitoring for all processes once
+        process_cpu_baseline = {}
+        for proc in psutil.process_iter(['pid']):
+            try:
+                process_cpu_baseline[proc.pid] = proc.cpu_percent()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+
+        # Create progress bar for monitoring
+        if HAS_UI_LIBS:
+            pbar = tqdm(
+                total=self.monitoring_duration,
+                desc="🔍 Monitoring CPU",
+                unit="s",
+                bar_format="{l_bar}{bar}| {n:.0f}/{total:.0f}s [{elapsed}<{remaining}]"
+            )
+
         while time.time() - start_time < self.monitoring_duration:
-            cpu_percent = psutil.cpu_percent(interval=1)  # Already blocks for 1 second
+            cpu_percent = psutil.cpu_percent(interval=1)  # Single system-wide measurement
             cpu_readings.append(cpu_percent)
 
             if cpu_percent > self.cpu_threshold:
-                self.log(f"⚠️ High CPU usage detected: {cpu_percent:.1f}%")
-                self.analyze_processes()
+                self.log(f"⚠️ High CPU usage detected: {cpu_percent:.1f}%", "warning")
+                # Pass the baseline to avoid re-priming
+                self.analyze_processes(process_cpu_baseline)
+
+            # Update progress bar
+            if HAS_UI_LIBS:
+                pbar.update(1)
+                pbar.set_postfix({"CPU": f"{cpu_percent:.1f}%"})
 
             # No additional sleep needed - psutil.cpu_percent(interval=1) already waited
+
+        if HAS_UI_LIBS:
+            pbar.close()
 
         avg_cpu = sum(cpu_readings) / len(cpu_readings)
         max_cpu = max(cpu_readings)
@@ -164,11 +246,9 @@ class AugmentSecretDetector:
 
                     augment_processes.append(process_data)
 
-                    # Normalize CPU usage for multi-core systems
-                    cpu_cores = psutil.cpu_count()
-                    normalized_threshold = (
-                        80 / cpu_cores
-                    )  # Adjust threshold based on core count
+                    # Improved threshold calculation (non-linear scaling)
+                    cpu_cores = psutil.cpu_count(logical=True)
+                    normalized_threshold = max(20, 0.7 * cpu_cores)  # More realistic threshold
 
                     if (
                         cpu_usage > normalized_threshold

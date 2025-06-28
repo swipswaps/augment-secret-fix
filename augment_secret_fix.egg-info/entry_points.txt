@@ -1,0 +1,5 @@
+[console_scripts]
+augment-detect = augment_secret_fix.detector:main
+augment-fix = augment_secret_fix.cli:main
+augment-version = augment_secret_fix.version_manager:main
+augment-vscode = augment_secret_fix.updater:main
